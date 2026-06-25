@@ -1109,11 +1109,9 @@ function calcBill(idx) {
   const wCost  = wUnits * settings.waterRate;
   const eCost  = eUnits * settings.elecRate;
   const extras = parseFloat(m.extras)||0;
-  const extraItems = m.extraItems || [];
-  const extraItemsTotal = extraItems.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
-  const total  = h.rent + wCost + eCost + extras + extraItemsTotal;
+  const total  = h.rent + wCost + eCost + extras;
   const paid   = ((payments[currentMonth]||{})[h.id]) === 'paid';
-  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, total, paid };
+  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', total, paid };
 }
 
 function badgeHTML(paid) {
@@ -1408,24 +1406,10 @@ function filterBills(val) { renderBills(val); }
 // ═══════════════════════════════════════════
 function openBill(idx) {
   activeBillIdx = idx;
-  renderBillDetail(idx);
-  document.getElementById('billModal').classList.add('open');
-}
-
-function renderBillDetail(idx) {
   const h = houses[idx];
   const b = calcBill(idx);
   const m = getMeter(currentMonth, h.id);
   document.getElementById('bill-modal-title').textContent = `ใบแจ้งหนี้ — UNIT ${h.id}`;
-  const extraItemsHTML = (b.extraItems||[]).map((e,i)=>`
-    <div class="bill-row" style="align-items:center">
-      <span>📌 ${e.name||'รายการพิเศษ'}</span>
-      <span style="display:flex;align-items:center;gap:6px">
-        <span style="color:var(--accent2)">${fmt(parseFloat(e.amount)||0)} บาท</span>
-        <button onclick="editExtraItem(${idx},${i})" style="background:none;border:1px solid #888;color:#aaa;padding:1px 6px;font-size:11px;cursor:pointer;border-radius:3px">แก้</button>
-        <button onclick="removeExtraItem(${idx},${i})" style="background:none;border:1px solid #ef5350;color:#ef5350;padding:1px 6px;font-size:11px;cursor:pointer;border-radius:3px">ลบ</button>
-      </span>
-    </div>`).join('');
   document.getElementById('bill-detail').innerHTML = `
     <div class="bill-row"><span>ผู้เช่า</span><span>${h.name}</span></div>
     <div class="bill-row"><span>เดือน</span><span>${MONTHS[currentMonth]}</span></div>
@@ -1443,57 +1427,13 @@ function renderBillDetail(idx) {
       <span>📌 ค่าใช้จ่ายอื่นๆ${b.extrasNote ? ' ('+b.extrasNote+')' : ''}</span>
       <span style="color:var(--accent2)">${fmt(b.extras)} บาท</span>
     </div>` : ''}
-    ${extraItemsHTML}
-    <div style="margin-top:8px;padding:8px;background:#1e2430;border-radius:6px;border:1px dashed #334">
-      <div style="font-size:12px;color:#888;margin-bottom:6px">+ เพิ่มรายการอื่นๆ</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <input id="ei-name-${idx}" type="text" placeholder="ชื่อรายการ เช่น ค่าซ่อม" style="flex:2;min-width:120px;background:#111;border:1px solid #334;color:#fff;padding:5px 8px;font-size:13px;border-radius:4px">
-        <input id="ei-amt-${idx}" type="number" placeholder="จำนวนเงิน" style="flex:1;min-width:80px;background:#111;border:1px solid #334;color:#fff;padding:5px 8px;font-size:13px;border-radius:4px">
-        <button onclick="addExtraItem(${idx})" style="background:var(--primary);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">+ เพิ่ม</button>
-      </div>
-    </div>
     <div class="bill-total">
       <span>รวมทั้งสิ้น</span>
       <span class="amount">${fmt(b.total)} บาท</span>
     </div>
     <div style="margin-top:12px;text-align:center">${badgeHTML(b.paid)}</div>
   `;
-}
-
-function addExtraItem(idx) {
-  const nameEl = document.getElementById('ei-name-'+idx);
-  const amtEl = document.getElementById('ei-amt-'+idx);
-  const name = nameEl.value.trim();
-  const amount = parseFloat(amtEl.value)||0;
-  if(!name || !amount){ showToast('กรุณาระบุชื่อรายการและจำนวนเงิน','error'); return; }
-  const m = getMeter(currentMonth, houses[idx].id);
-  if(!m.extraItems) m.extraItems = [];
-  m.extraItems.push({name, amount});
-  save();
-  renderBillDetail(idx);
-  showToast('เพิ่มรายการแล้ว ✓');
-}
-
-function removeExtraItem(idx, itemIdx) {
-  const m = getMeter(currentMonth, houses[idx].id);
-  if(!m.extraItems) return;
-  m.extraItems.splice(itemIdx, 1);
-  save();
-  renderBillDetail(idx);
-  showToast('ลบรายการแล้ว');
-}
-
-function editExtraItem(idx, itemIdx) {
-  const m = getMeter(currentMonth, houses[idx].id);
-  const item = m.extraItems[itemIdx];
-  const newName = prompt('ชื่อรายการ:', item.name||'');
-  if(newName === null) return;
-  const newAmt = prompt('จำนวนเงิน:', item.amount||0);
-  if(newAmt === null) return;
-  m.extraItems[itemIdx] = {name: newName.trim()||item.name, amount: parseFloat(newAmt)||item.amount};
-  save();
-  renderBillDetail(idx);
-  showToast('แก้ไขรายการแล้ว ✓');
+  document.getElementById('billModal').classList.add('open');
 }
 
 function markPaid() {
@@ -1786,11 +1726,6 @@ function receiptHTML(idx) {
           <td>${b.extrasNote||'-'}</td>
           <td style="text-align:right">${fmt(b.extras)}</td>
         </tr>` : ''}
-        ${(b.extraItems||[]).map(e=>`<tr>
-          <td>📌 ${e.name||'รายการพิเศษ'}</td>
-          <td>-</td>
-          <td style="text-align:right">${fmt(parseFloat(e.amount)||0)}</td>
-        </tr>`).join('')}
         <tr class="receipt-total-row">
           <td colspan="2"><strong>รวมทั้งสิ้น</strong></td>
           <td style="text-align:right"><span class="receipt-amount">${fmt(b.total)}</span></td>
