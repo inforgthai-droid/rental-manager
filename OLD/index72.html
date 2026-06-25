@@ -858,7 +858,7 @@ window.signInWithGoogle = async () => {
   btn.textContent = 'กำลังเข้าสู่ระบบ...';
   btn.disabled = true;
   try {
-    await fbAuth.signInWithRedirect(googleProvider);
+    await fbAuth.signInWithPopup(googleProvider);
   } catch(e) {
     btn.disabled = false;
     btn.textContent = 'เข้าสู่ระบบด้วย Google';
