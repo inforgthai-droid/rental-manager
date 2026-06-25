@@ -807,7 +807,7 @@
       <button class="btn btn-outline" onclick="closeModal('billModal')">ปิด</button>
       <button class="btn btn-outline" onclick="printReceipt(activeBillIdx)">🖨️ พิมพ์</button>
       <button class="btn btn-outline" style="border-color:#ef5350;color:#ef5350" onclick="saveReceiptPDF(activeBillIdx)">📄 บันทึก PDF</button>
-      <button class="btn btn-sm" onclick="promptPartialPayModal()" style="background:#f59e0b;color:#000;font-weight:700">💛 ชำระบางส่วน</button>
+      <button class="btn btn-sm" onclick="promptPartialPayModal()" style="background:#f59e0b22;border:1px solid #f59e0b;color:#f59e0b">💛 ชำระบางส่วน</button>
       <button class="btn btn-primary" onclick="markPaid()">✅ ชำระครบแล้ว</button>
     </div>
   </div>
@@ -1125,17 +1125,10 @@ function calcBill(idx) {
   const total  = rentThisMonth + wCost + eCost + extras + extraItemsTotal + arrearsTotal;
   const payStatus = (payments[currentMonth]||{})[h.id] || 'unpaid';
   const paid   = payStatus === 'paid';
-  // รองรับทั้ง format เก่า 'partial:xxx' และ format ใหม่ array [{amount,date}]
-  let partialList = [];
-  if(Array.isArray(payStatus)) {
-    partialList = payStatus;
-  } else if(typeof payStatus==='string' && payStatus.startsWith('partial:')) {
-    partialList = [{amount: parseFloat(payStatus.replace('partial:',''))||0, date:''}];
-  }
-  const partial = !paid && partialList.length > 0;
-  const partialAmount = partialList.reduce((a,p)=>a+(parseFloat(p.amount)||0),0);
-  const remaining = Math.max(0, total - partialAmount);
-  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid, partial, partialAmount, partialList, remaining, rentThisMonth };
+  const partial = payStatus && payStatus !== 'paid' && payStatus !== 'unpaid';
+  const partialAmount = partial ? parseFloat(payStatus.replace('partial:',''))||0 : 0;
+  const remaining = partial ? Math.max(0, total - partialAmount) : total;
+  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid, partial, partialAmount, remaining, rentThisMonth };
 }
 
 // หาเดือนที่ค้างชำระสำหรับบ้านหลังนี้
@@ -1170,7 +1163,7 @@ function getUnpaidMonths(idx) {
 
 function badgeHTML(paid, partial, partialAmount) {
   if(paid) return '<span class="badge badge-paid">✓ ชำระแล้ว</span>';
-  if(partial) return '<span class="badge badge-partial">💛 ชำระแล้ว '+fmt(partialAmount)+' บ.</span>';
+  if(partial) return '<span class="badge badge-partial">💛 ชำระบางส่วน '+fmt(partialAmount)+' บ.</span>';
   return '<span class="badge badge-unpaid">⏳ ค้างชำระ</span>';
 }
 
@@ -1522,15 +1515,6 @@ function renderBillDetail(idx) {
     <button onclick="showArrearsSelector(${idx})" style="margin:6px 0 2px;width:100%;background:transparent;border:1px dashed #f59e0b;color:#f59e0b;padding:6px;font-size:12px;cursor:pointer;border-radius:4px;font-family:Sarabun,sans-serif">
       📋 เพิ่มยอดค้างชำระจากเดือนก่อน
     </button>
-    <div id="partial-form-${idx}" style="display:none;margin:6px 0;padding:10px;background:#1a1200;border-radius:6px;border:1px solid #f59e0b55">
-      <div style="font-size:12px;color:#f59e0b;margin-bottom:8px;font-weight:700">💛 บันทึกการชำระบางส่วน</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-        <input id="partial-amt-${idx}" type="number" placeholder="จำนวนเงิน" style="flex:1;min-width:100px;background:#111;border:1px solid #f59e0b55;color:#fff;padding:6px 8px;font-size:14px;font-weight:700;border-radius:4px">
-        <input id="partial-date-${idx}" type="date" style="flex:1;min-width:130px;background:#111;border:1px solid #334;color:#fff;padding:6px 8px;font-size:13px;border-radius:4px">
-        <button onclick="addPartialPayment(${idx})" style="background:#f59e0b;color:#000;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">+ บันทึก</button>
-      </div>
-      <div style="font-size:11px;color:#888">ถ้าชำระครบยอด ระบบจะเปลี่ยนสถานะเป็น "ชำระแล้ว" อัตโนมัติ</div>
-    </div>
     <div style="margin-top:8px;padding:8px;background:#1e2430;border-radius:6px;border:1px dashed #334">
       <div style="font-size:12px;color:#888;margin-bottom:6px">+ เพิ่มรายการอื่นๆ</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1550,22 +1534,6 @@ function renderBillDetail(idx) {
           <button onclick="removeArrear(${idx},${i})" style="background:none;border:1px solid #ef5350;color:#ef5350;padding:1px 5px;font-size:10px;cursor:pointer;border-radius:2px">ลบ</button>
         </span>
       </div>`).join('')}
-    </div>` : ''}
-    ${(b.partialList||[]).length > 0 ? `
-    <div style="background:#1a1200;border:1px solid #f59e0b33;border-radius:4px;padding:6px 8px;margin:4px 0">
-      <div style="font-size:11px;color:#f59e0b;margin-bottom:4px">💛 รายการชำระบางส่วน (รวม ${fmt(b.partialAmount)} บาท)</div>
-      ${(b.partialList||[]).map((p,pi)=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #2a2200">
-        <span style="font-size:12px;color:#aaa">${p.date||'ไม่ระบุวันที่'}</span>
-        <span style="display:flex;align-items:center;gap:6px">
-          <span style="color:#f59e0b;font-weight:700">${fmt(p.amount)} บาท</span>
-          <button onclick="removePartialItem(${idx},${pi})" style="background:none;border:1px solid #ef5350;color:#ef5350;padding:1px 5px;font-size:10px;cursor:pointer;border-radius:2px">ลบ</button>
-        </span>
-      </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:5px">
-        <span style="color:#888">ยังค้างอีก</span>
-        <span style="color:#ef5350;font-weight:700">${fmt(b.remaining)} บาท</span>
-      </div>
     </div>` : ''}
     <div class="bill-total">
       <span>รวมทั้งสิ้น</span>
@@ -1690,57 +1658,24 @@ function markPaid() {
   renderBills(); renderDashboard();
 }
 
-function getPartialList(idx) {
-  const ps = (payments[currentMonth]||{})[houses[idx].id] || 'unpaid';
-  if(Array.isArray(ps)) return ps;
-  if(typeof ps==='string' && ps.startsWith('partial:')) return [{amount:parseFloat(ps.replace('partial:',''))||0,date:''}];
-  return [];
-}
-
 function promptPartialPay(idx) {
-  // เปิด mini form ใน bill modal แทน
-  if(activeBillIdx !== idx) { activeBillIdx = idx; renderBillDetail(idx); }
-  document.getElementById('billModal').classList.add('open');
-  setTimeout(()=>{
-    const form = document.getElementById('partial-form-'+idx);
-    if(form) form.style.display = form.style.display==='none'?'block':'none';
-  }, 50);
-}
-
-function addPartialPayment(idx) {
-  const amtEl = document.getElementById('partial-amt-'+idx);
-  const dateEl = document.getElementById('partial-date-'+idx);
-  const amt = parseFloat(amtEl?.value)||0;
-  const date = dateEl?.value||'';
-  if(amt<=0){ showToast('กรุณาระบุจำนวนเงิน','error'); return; }
   const b = calcBill(idx);
-  const list = getPartialList(idx);
-  list.push({amount:amt, date:date||new Date().toLocaleDateString('th-TH')});
-  const newTotal = list.reduce((a,p)=>a+(parseFloat(p.amount)||0),0);
+  const prev = b.partial ? b.partialAmount : 0;
+  const val = prompt(`ชำระบางส่วน — ยอดรวม ${fmt(b.total)} บาท\nระบุจำนวนที่ชำระแล้ว:`, prev||'');
+  if(val===null) return;
+  const amt = parseFloat(val)||0;
+  if(amt<=0){ showToast('กรุณาระบุจำนวนเงิน','error'); return; }
+  if(amt>=b.total){ quickPaid(idx); return; }
   if(!payments[currentMonth]) payments[currentMonth]={};
-  if(newTotal >= b.total) {
-    payments[currentMonth][houses[idx].id] = 'paid';
-    showToast('ชำระครบแล้ว ✓');
-  } else {
-    payments[currentMonth][houses[idx].id] = list;
-    showToast('บันทึกชำระ '+fmt(amt)+' บาท ✓');
-  }
-  save(); renderBillDetail(idx); renderDashboard(); renderBills();
-}
-
-function removePartialItem(idx, pi) {
-  const list = getPartialList(idx);
-  list.splice(pi,1);
-  if(!payments[currentMonth]) payments[currentMonth]={};
-  payments[currentMonth][houses[idx].id] = list.length > 0 ? list : 'unpaid';
-  save(); renderBillDetail(idx); renderDashboard(); renderBills();
-  showToast('ลบรายการชำระแล้ว');
+  payments[currentMonth][houses[idx].id] = 'partial:'+amt;
+  save(); renderDashboard(); renderBills();
+  showToast('บันทึกชำระบางส่วน '+fmt(amt)+' บาท ✓');
 }
 
 function promptPartialPayModal() {
   if(activeBillIdx===null) return;
-  const form = document.getElementById('partial-form-'+activeBillIdx);
-  if(form) form.style.display = form.style.display==='none' ? 'block' : 'none';
+  promptPartialPay(activeBillIdx);
+  closeModal('billModal');
 }
 
 // ═══════════════════════════════════════════
