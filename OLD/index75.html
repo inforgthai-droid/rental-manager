@@ -1111,41 +1111,9 @@ function calcBill(idx) {
   const extras = parseFloat(m.extras)||0;
   const extraItems = m.extraItems || [];
   const extraItemsTotal = extraItems.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
-  // ยอดค้างชำระจากเดือนก่อน
-  const arrears = getArrearsForHouse(idx);
-  const arrearsTotal = arrears.reduce((a,ar)=>a+ar.amount, 0);
-  const total  = h.rent + wCost + eCost + extras + extraItemsTotal + arrearsTotal;
+  const total  = h.rent + wCost + eCost + extras + extraItemsTotal;
   const paid   = ((payments[currentMonth]||{})[h.id]) === 'paid';
-  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid };
-}
-
-// หาเดือนที่ค้างชำระสำหรับบ้านหลังนี้
-function getArrearsForHouse(idx) {
-  const h = houses[idx];
-  // ดู arrears ที่ถูก mark ไว้ใน meters ของเดือนปัจจุบัน
-  const m = getMeter(currentMonth, h.id);
-  return m.arrears || [];
-}
-
-// เดือนที่ค้างชำระทั้งหมดของบ้านหลังนี้ (ไม่รวมปัจจุบัน)
-function getUnpaidMonths(idx) {
-  const h = houses[idx];
-  const unpaid = [];
-  // ดูย้อนหลัง 12 เดือน
-  const [cy, cm] = currentMonth.split('-').map(Number);
-  for(let i=1; i<=12; i++) {
-    let mo = cm - i, yr = cy;
-    if(mo <= 0){ mo += 12; yr -= 1; }
-    const key = padKey(yr, mo);
-    const isPaid = ((payments[key]||{})[h.id]) === 'paid';
-    if(!isPaid) {
-      const b = calcBill_for(idx, key);
-      if(b.total > 0) {
-        unpaid.push({ month: key, label: monthLabel(key), amount: b.total });
-      }
-    }
-  }
-  return unpaid;
+  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, total, paid };
 }
 
 function badgeHTML(paid) {
@@ -1476,10 +1444,6 @@ function renderBillDetail(idx) {
       <span style="color:var(--accent2)">${fmt(b.extras)} บาท</span>
     </div>` : ''}
     ${extraItemsHTML}
-    <div id="arrears-section-${idx}" style="margin-top:8px"></div>
-    <button onclick="showArrearsSelector(${idx})" style="margin:6px 0 2px;width:100%;background:transparent;border:1px dashed #f59e0b;color:#f59e0b;padding:6px;font-size:12px;cursor:pointer;border-radius:4px;font-family:Sarabun,sans-serif">
-      📋 เพิ่มยอดค้างชำระจากเดือนก่อน
-    </button>
     <div style="margin-top:8px;padding:8px;background:#1e2430;border-radius:6px;border:1px dashed #334">
       <div style="font-size:12px;color:#888;margin-bottom:6px">+ เพิ่มรายการอื่นๆ</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1488,27 +1452,12 @@ function renderBillDetail(idx) {
         <button onclick="addExtraItem(${idx})" style="background:var(--primary);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">+ เพิ่ม</button>
       </div>
     </div>
-    ${(b.arrears||[]).length > 0 ? `
-    <div style="background:#2a1f00;border:1px solid #f59e0b33;border-radius:4px;padding:6px 8px;margin:4px 0">
-      <div style="font-size:11px;color:#f59e0b;margin-bottom:4px">⚠️ ยอดค้างชำระจากเดือนก่อน</div>
-      ${(b.arrears||[]).map((ar,i)=>`
-      <div class="bill-row" style="align-items:center;padding:2px 0">
-        <span style="font-size:12px">${ar.label||ar.month}</span>
-        <span style="display:flex;align-items:center;gap:6px">
-          <span style="color:#f59e0b;font-weight:700">${fmt(ar.amount)} บาท</span>
-          <button onclick="removeArrear(${idx},${i})" style="background:none;border:1px solid #ef5350;color:#ef5350;padding:1px 5px;font-size:10px;cursor:pointer;border-radius:2px">ลบ</button>
-        </span>
-      </div>`).join('')}
-    </div>` : ''}
     <div class="bill-total">
       <span>รวมทั้งสิ้น</span>
       <span class="amount">${fmt(b.total)} บาท</span>
     </div>
     <div style="margin-top:12px;text-align:center">${badgeHTML(b.paid)}</div>
   `;
-  // render arrears selector ถ้ามีอยู่
-  const arSec = document.getElementById('arrears-section-'+idx);
-  if(arSec) arSec.innerHTML = '';
 }
 
 function addExtraItem(idx) {
@@ -1545,52 +1494,6 @@ function editExtraItem(idx, itemIdx) {
   save();
   renderBillDetail(idx);
   showToast('แก้ไขรายการแล้ว ✓');
-}
-
-function showArrearsSelector(idx) {
-  const unpaid = getUnpaidMonths(idx);
-  const m = getMeter(currentMonth, houses[idx].id);
-  const alreadyAdded = (m.arrears||[]).map(a=>a.month);
-  if(unpaid.length === 0){
-    showToast('ไม่มียอดค้างชำระจากเดือนก่อน','info');
-    return;
-  }
-  const arSec = document.getElementById('arrears-section-'+idx);
-  if(!arSec) return;
-  arSec.innerHTML = `
-    <div style="background:#1a1200;border:1px solid #f59e0b55;border-radius:6px;padding:8px;margin-bottom:6px">
-      <div style="font-size:12px;color:#f59e0b;margin-bottom:6px">📋 เลือกเดือนที่ค้างชำระ</div>
-      ${unpaid.map(u=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #2a2200">
-          <span style="font-size:13px">${u.label}</span>
-          <span style="display:flex;align-items:center;gap:8px">
-            <span style="color:#f59e0b">${fmt(u.amount)} บาท</span>
-            ${alreadyAdded.includes(u.month)
-              ? '<span style="color:#888;font-size:11px">เพิ่มแล้ว</span>'
-              : `<button onclick="addArrear(${idx},'${u.month}','${u.label}',${u.amount})" style="background:#f59e0b;color:#000;border:none;padding:3px 10px;font-size:12px;cursor:pointer;border-radius:3px;font-weight:700">+ เพิ่ม</button>`}
-          </span>
-        </div>`).join('')}
-      <button onclick="document.getElementById('arrears-section-${idx}').innerHTML=''" style="margin-top:6px;width:100%;background:transparent;border:1px solid #444;color:#888;padding:4px;font-size:11px;cursor:pointer">ปิด</button>
-    </div>`;
-}
-
-function addArrear(idx, month, label, amount) {
-  const m = getMeter(currentMonth, houses[idx].id);
-  if(!m.arrears) m.arrears = [];
-  if(m.arrears.find(a=>a.month===month)){ showToast('เพิ่มแล้ว','info'); return; }
-  m.arrears.push({month, label, amount});
-  save();
-  renderBillDetail(idx);
-  showToast('เพิ่มยอดค้าง '+label+' แล้ว ✓');
-}
-
-function removeArrear(idx, arIdx) {
-  const m = getMeter(currentMonth, houses[idx].id);
-  if(!m.arrears) return;
-  m.arrears.splice(arIdx, 1);
-  save();
-  renderBillDetail(idx);
-  showToast('ลบยอดค้างออกแล้ว');
 }
 
 function markPaid() {
@@ -1887,11 +1790,6 @@ function receiptHTML(idx) {
           <td>📌 ${e.name||'รายการพิเศษ'}</td>
           <td>-</td>
           <td style="text-align:right">${fmt(parseFloat(e.amount)||0)}</td>
-        </tr>`).join('')}
-        ${(b.arrears||[]).map(ar=>`<tr>
-          <td>⚠️ ยอดค้าง ${ar.label||ar.month}</td>
-          <td>ค้างชำระจากเดือนก่อน</td>
-          <td style="text-align:right;color:#f59e0b">${fmt(ar.amount)}</td>
         </tr>`).join('')}
         <tr class="receipt-total-row">
           <td colspan="2"><strong>รวมทั้งสิ้น</strong></td>
