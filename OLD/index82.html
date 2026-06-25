@@ -1127,8 +1127,6 @@ function calcBill(idx) {
   const h = houses[idx];
   const m = getMeter(currentMonth, h.id);
   const rentThisMonth = (m.rentOverride != null && m.rentOverride !== '') ? parseFloat(m.rentOverride)||h.rent : h.rent;
-  const discount = parseFloat(m.discount)||0;
-  const discountNote = m.discountNote||'';
   const wUnits = Math.max(0, (m.wCurr||0) - (m.wPrev||0));
   const eUnits = Math.max(0, (m.eCurr||0) - (m.ePrev||0));
   const wCost  = wUnits * settings.waterRate;
@@ -1139,7 +1137,7 @@ function calcBill(idx) {
   // ยอดค้างชำระจากเดือนก่อน
   const arrears = getArrearsForHouse(idx);
   const arrearsTotal = arrears.reduce((a,ar)=>a+ar.amount, 0);
-  const total  = Math.max(0, rentThisMonth + wCost + eCost + extras + extraItemsTotal + arrearsTotal - discount);
+  const total  = rentThisMonth + wCost + eCost + extras + extraItemsTotal + arrearsTotal;
   const payStatus = (payments[currentMonth]||{})[h.id] || 'unpaid';
   const paid   = payStatus === 'paid';
   // รองรับทั้ง format เก่า 'partial:xxx' และ format ใหม่ array [{amount,date}]
@@ -1152,7 +1150,7 @@ function calcBill(idx) {
   const partial = !paid && partialList.length > 0;
   const partialAmount = partialList.reduce((a,p)=>a+(parseFloat(p.amount)||0),0);
   const remaining = Math.max(0, total - partialAmount);
-  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, discount, discountNote, total, paid, partial, partialAmount, partialList, remaining, rentThisMonth };
+  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid, partial, partialAmount, partialList, remaining, rentThisMonth };
 }
 
 // หาเดือนที่ค้างชำระสำหรับบ้านหลังนี้
@@ -1539,24 +1537,6 @@ function renderBillDetail(idx) {
     <button onclick="showArrearsSelector(${idx})" style="margin:6px 0 2px;width:100%;background:transparent;border:1px dashed #f59e0b;color:#f59e0b;padding:6px;font-size:12px;cursor:pointer;border-radius:4px;font-family:Sarabun,sans-serif">
       📋 เพิ่มยอดค้างชำระจากเดือนก่อน
     </button>
-    ${b.discount > 0 ? `<div class="bill-row" style="color:#10b981;align-items:center">
-      <span>🎁 ส่วนลด${b.discountNote?' ('+b.discountNote+')':''}</span>
-      <span style="display:flex;align-items:center;gap:6px">
-        <span style="color:#10b981;font-weight:700">- ${fmt(b.discount)} บาท</span>
-        <button onclick="clearDiscount(${idx})" style="background:none;border:1px solid #ef5350;color:#ef5350;padding:1px 5px;font-size:10px;cursor:pointer;border-radius:2px">ลบ</button>
-      </span>
-    </div>` : ''}
-    <div id="discount-form-${idx}" style="display:none;margin:4px 0 6px;padding:8px;background:#0a1f0a;border-radius:6px;border:1px solid #10b98155">
-      <div style="font-size:12px;color:#10b981;margin-bottom:6px;font-weight:700">🎁 เพิ่มส่วนลด</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <input id="disc-amt-${idx}" type="number" placeholder="จำนวนส่วนลด" style="flex:1;min-width:100px;background:#111;border:1px solid #10b98155;color:#fff;padding:6px 8px;font-size:14px;border-radius:4px">
-        <input id="disc-note-${idx}" type="text" placeholder="หมายเหตุ เช่น โปรโมชั่น" style="flex:2;min-width:120px;background:#111;border:1px solid #334;color:#fff;padding:6px 8px;font-size:13px;border-radius:4px">
-        <button onclick="saveDiscount(${idx})" style="background:#10b981;color:#000;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">บันทึก</button>
-      </div>
-    </div>
-    <button onclick="toggleDiscountForm(${idx})" style="margin:4px 0;width:100%;background:transparent;border:1px dashed #10b981;color:#10b981;padding:5px;font-size:12px;cursor:pointer;border-radius:4px">
-      🎁 เพิ่ม / แก้ไขส่วนลด
-    </button>
     <div id="partial-form-${idx}" style="display:none;margin:6px 0;padding:10px;background:#1a1200;border-radius:6px;border:1px solid #f59e0b55">
       <div style="font-size:12px;color:#f59e0b;margin-bottom:8px;font-weight:700">💛 บันทึกการชำระบางส่วน</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
@@ -1763,38 +1743,6 @@ function addPartialPayment(idx) {
   save(); renderBillDetail(idx); renderDashboard(); renderBills();
 }
 
-function toggleDiscountForm(idx) {
-  const f = document.getElementById('discount-form-'+idx);
-  if(!f) return;
-  const b = calcBill(idx);
-  const amtEl = document.getElementById('disc-amt-'+idx);
-  const noteEl = document.getElementById('disc-note-'+idx);
-  if(amtEl && b.discount > 0) amtEl.value = b.discount;
-  if(noteEl && b.discountNote) noteEl.value = b.discountNote;
-  f.style.display = f.style.display==='none' ? 'block' : 'none';
-}
-
-function saveDiscount(idx) {
-  const amt = parseFloat(document.getElementById('disc-amt-'+idx)?.value)||0;
-  const note = document.getElementById('disc-note-'+idx)?.value||'';
-  const m = getMeter(currentMonth, houses[idx].id);
-  m.discount = amt;
-  m.discountNote = note;
-  save();
-  showToast(amt > 0 ? 'บันทึกส่วนลด '+fmt(amt)+' บาท ✓' : 'ลบส่วนลดแล้ว');
-  renderBillDetail(idx);
-  renderDashboard();
-}
-
-function clearDiscount(idx) {
-  const m = getMeter(currentMonth, houses[idx].id);
-  m.discount = 0; m.discountNote = '';
-  save();
-  showToast('ลบส่วนลดแล้ว');
-  renderBillDetail(idx);
-  renderDashboard();
-}
-
 function removePartialItem(idx, pi) {
   const list = getPartialList(idx);
   list.splice(pi,1);
@@ -1845,8 +1793,6 @@ function calcBill_for(idx, month) {
   const arrears = m.arrears || [];
   const arrearsTotal = arrears.reduce((a,ar)=>a+ar.amount,0);
   const rentThisMonth = (m.rentOverride != null && m.rentOverride !== '') ? parseFloat(m.rentOverride)||h.rent : h.rent;
-  const discount = parseFloat(m.discount)||0;
-  const discountNote = m.discountNote||'';
   const total = rentThisMonth + wUnits*settings.waterRate + eUnits*settings.elecRate + extras + extraItemsTotal + arrearsTotal;
   return { total, rentThisMonth };
 }
@@ -2114,11 +2060,6 @@ function receiptHTML(idx) {
           <td>ค้างชำระจากเดือนก่อน</td>
           <td style="text-align:right;color:#f59e0b">${fmt(ar.amount)}</td>
         </tr>`).join('')}
-        ${b.discount > 0 ? `<tr>
-          <td>🎁 ส่วนลด${b.discountNote?' ('+b.discountNote+')':''}</td>
-          <td>-</td>
-          <td style="text-align:right;color:#10b981">- ${fmt(b.discount)}</td>
-        </tr>` : ''}
         <tr class="receipt-total-row">
           <td colspan="2"><strong>รวมทั้งสิ้น</strong></td>
           <td style="text-align:right"><span class="receipt-amount">${fmt(b.total)}</span></td>
