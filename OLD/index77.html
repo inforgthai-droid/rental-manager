@@ -807,8 +807,7 @@
       <button class="btn btn-outline" onclick="closeModal('billModal')">ปิด</button>
       <button class="btn btn-outline" onclick="printReceipt(activeBillIdx)">🖨️ พิมพ์</button>
       <button class="btn btn-outline" style="border-color:#ef5350;color:#ef5350" onclick="saveReceiptPDF(activeBillIdx)">📄 บันทึก PDF</button>
-      <button class="btn btn-sm" onclick="promptPartialPayModal()" style="background:#f59e0b22;border:1px solid #f59e0b;color:#f59e0b">💛 ชำระบางส่วน</button>
-      <button class="btn btn-primary" onclick="markPaid()">✅ ชำระครบแล้ว</button>
+      <button class="btn btn-primary" onclick="markPaid()">✅ บันทึกชำระแล้ว</button>
     </div>
   </div>
 </div>
@@ -1122,12 +1121,8 @@ function calcBill(idx) {
   const arrears = getArrearsForHouse(idx);
   const arrearsTotal = arrears.reduce((a,ar)=>a+ar.amount, 0);
   const total  = h.rent + wCost + eCost + extras + extraItemsTotal + arrearsTotal;
-  const payStatus = (payments[currentMonth]||{})[h.id] || 'unpaid';
-  const paid   = payStatus === 'paid';
-  const partial = payStatus && payStatus !== 'paid' && payStatus !== 'unpaid';
-  const partialAmount = partial ? parseFloat(payStatus.replace('partial:',''))||0 : 0;
-  const remaining = partial ? Math.max(0, total - partialAmount) : total;
-  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid, partial, partialAmount, remaining };
+  const paid   = ((payments[currentMonth]||{})[h.id]) === 'paid';
+  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid };
 }
 
 // หาเดือนที่ค้างชำระสำหรับบ้านหลังนี้
@@ -1148,8 +1143,7 @@ function getUnpaidMonths(idx) {
     let mo = cm - i, yr = cy;
     if(mo <= 0){ mo += 12; yr -= 1; }
     const key = padKey(yr, mo);
-    const _ps = (payments[key]||{})[h.id]||'';
-    const isPaid = _ps === 'paid';
+    const isPaid = ((payments[key]||{})[h.id]) === 'paid';
     if(!isPaid) {
       const b = calcBill_for(idx, key);
       if(b.total > 0) {
@@ -1160,9 +1154,8 @@ function getUnpaidMonths(idx) {
   return unpaid;
 }
 
-function badgeHTML(paid, partial, partialAmount) {
+function badgeHTML(paid) {
   if(paid) return '<span class="badge badge-paid">✓ ชำระแล้ว</span>';
-  if(partial) return '<span class="badge badge-partial">💛 ชำระบางส่วน '+fmt(partialAmount)+' บ.</span>';
   return '<span class="badge badge-unpaid">⏳ ค้างชำระ</span>';
 }
 
@@ -1235,7 +1228,6 @@ function renderDashboard() {
     sumElec  += b.eCost;
     sumTotal += b.total;
     if(b.paid) paidCnt++;
-    if(b.partial) paidCnt+=0.5;
     rows += `<tr>
       <td><span class="house-num">${h.id}</span></td>
       <td>${h.name}</td>
@@ -1243,17 +1235,11 @@ function renderDashboard() {
       <td style="color:var(--water)">${fmt(b.wCost)}</td>
       <td style="color:var(--electric)">${fmt(b.eCost)}</td>
       <td style="font-weight:600">${fmt(b.total)}</td>
-      <td>${badgeHTML(b.paid, b.partial, b.partialAmount)}</td>
+      <td>${badgeHTML(b.paid)}</td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="openBill(${i})">ดูบิล</button>
         <button class="btn btn-outline btn-sm" onclick="openMeterModal(${i})" style="margin-left:4px;border-color:var(--water);color:var(--water)">🔢 มิเตอร์</button>
-        ${b.paid
-          ?`<button class="btn btn-danger btn-sm" onclick="unmarkPaid(${i})" style="margin-left:4px">ยกเลิก</button>`
-          :b.partial
-            ?`<button class="btn btn-primary btn-sm" onclick="quickPaid(${i})" style="margin-left:4px">ชำระครบ</button>
-              <button class="btn btn-sm" onclick="openBill(${i})" style="margin-left:4px;background:#f59e0b22;border:1px solid #f59e0b;color:#f59e0b">แก้ไข</button>`
-            :`<button class="btn btn-primary btn-sm" onclick="quickPaid(${i})" style="margin-left:4px">ชำระ</button>
-              <button class="btn btn-sm" onclick="promptPartialPay(${i})" style="margin-left:4px;background:#f59e0b22;border:1px solid #f59e0b;color:#f59e0b;font-size:11px">บางส่วน</button>`}
+        ${b.paid?`<button class="btn btn-danger btn-sm" onclick="unmarkPaid(${i})" style="margin-left:4px">ยกเลิก</button>`:`<button class="btn btn-primary btn-sm" onclick="quickPaid(${i})" style="margin-left:4px">ชำระ</button>`}
       </td>
     </tr>`;
   });
@@ -1444,7 +1430,7 @@ function renderBills(filter='') {
       <td><span class="meter-diff elec">${b.eUnits}</span></td>
       <td style="color:var(--electric)">${fmt(b.eCost)}</td>
       <td style="font-weight:700;color:var(--accent2)">${fmt(b.total)}</td>
-      <td>${badgeHTML(b.paid, b.partial, b.partialAmount)}</td>
+      <td>${badgeHTML(b.paid)}</td>
       <td>
         <button class="btn btn-outline btn-sm" onclick="openBill(${i})">ดูบิล</button>
       </td>
@@ -1524,7 +1510,7 @@ function renderBillDetail(idx) {
       <span>รวมทั้งสิ้น</span>
       <span class="amount">${fmt(b.total)} บาท</span>
     </div>
-    <div style="margin-top:12px;text-align:center">${badgeHTML(b.paid, b.partial, b.partialAmount)}</div>
+    <div style="margin-top:12px;text-align:center">${badgeHTML(b.paid)}</div>
   `;
   // render arrears selector ถ้ามีอยู่
   const arSec = document.getElementById('arrears-section-'+idx);
@@ -1621,26 +1607,6 @@ function markPaid() {
   showToast('บันทึกชำระแล้ว ✓');
   closeModal('billModal');
   renderBills(); renderDashboard();
-}
-
-function promptPartialPay(idx) {
-  const b = calcBill(idx);
-  const prev = b.partial ? b.partialAmount : 0;
-  const val = prompt(`ชำระบางส่วน — ยอดรวม ${fmt(b.total)} บาท\nระบุจำนวนที่ชำระแล้ว:`, prev||'');
-  if(val===null) return;
-  const amt = parseFloat(val)||0;
-  if(amt<=0){ showToast('กรุณาระบุจำนวนเงิน','error'); return; }
-  if(amt>=b.total){ quickPaid(idx); return; }
-  if(!payments[currentMonth]) payments[currentMonth]={};
-  payments[currentMonth][houses[idx].id] = 'partial:'+amt;
-  save(); renderDashboard(); renderBills();
-  showToast('บันทึกชำระบางส่วน '+fmt(amt)+' บาท ✓');
-}
-
-function promptPartialPayModal() {
-  if(activeBillIdx===null) return;
-  promptPartialPay(activeBillIdx);
-  closeModal('billModal');
 }
 
 // ═══════════════════════════════════════════
