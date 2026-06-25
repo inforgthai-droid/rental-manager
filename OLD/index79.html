@@ -1708,13 +1708,7 @@ function calcBill_for(idx, month) {
   const wUnits = Math.max(0,(m.wCurr||0)-(m.wPrev||0));
   const eUnits = Math.max(0,(m.eCurr||0)-(m.ePrev||0));
   const extras = parseFloat(m.extras)||0;
-  const extraItems = m.extraItems || [];
-  const extraItemsTotal = extraItems.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
-  const arrears = m.arrears || [];
-  const arrearsTotal = arrears.reduce((a,ar)=>a+ar.amount,0);
-  const rentThisMonth = (m.rentOverride != null && m.rentOverride !== '') ? parseFloat(m.rentOverride)||h.rent : h.rent;
-  const total = rentThisMonth + wUnits*settings.waterRate + eUnits*settings.elecRate + extras + extraItemsTotal + arrearsTotal;
-  return { total, rentThisMonth };
+  return { total: h.rent + wUnits*settings.waterRate + eUnits*settings.elecRate + extras };
 }
 
 function jumpMonth(m) {
