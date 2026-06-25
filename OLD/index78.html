@@ -1111,7 +1111,6 @@ function getMeter(month, id) {
 function calcBill(idx) {
   const h = houses[idx];
   const m = getMeter(currentMonth, h.id);
-  const rentThisMonth = (m.rentOverride != null && m.rentOverride !== '') ? parseFloat(m.rentOverride)||h.rent : h.rent;
   const wUnits = Math.max(0, (m.wCurr||0) - (m.wPrev||0));
   const eUnits = Math.max(0, (m.eCurr||0) - (m.ePrev||0));
   const wCost  = wUnits * settings.waterRate;
@@ -1122,13 +1121,13 @@ function calcBill(idx) {
   // ยอดค้างชำระจากเดือนก่อน
   const arrears = getArrearsForHouse(idx);
   const arrearsTotal = arrears.reduce((a,ar)=>a+ar.amount, 0);
-  const total  = rentThisMonth + wCost + eCost + extras + extraItemsTotal + arrearsTotal;
+  const total  = h.rent + wCost + eCost + extras + extraItemsTotal + arrearsTotal;
   const payStatus = (payments[currentMonth]||{})[h.id] || 'unpaid';
   const paid   = payStatus === 'paid';
   const partial = payStatus && payStatus !== 'paid' && payStatus !== 'unpaid';
   const partialAmount = partial ? parseFloat(payStatus.replace('partial:',''))||0 : 0;
   const remaining = partial ? Math.max(0, total - partialAmount) : total;
-  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid, partial, partialAmount, remaining, rentThisMonth };
+  return { wUnits, eUnits, wCost, eCost, extras, extrasNote: m.extrasNote||'', extraItems, extraItemsTotal, arrears, arrearsTotal, total, paid, partial, partialAmount, remaining };
 }
 
 // หาเดือนที่ค้างชำระสำหรับบ้านหลังนี้
@@ -1483,21 +1482,7 @@ function renderBillDetail(idx) {
     <div class="bill-row"><span>ผู้เช่า</span><span>${h.name}</span></div>
     <div class="bill-row"><span>เดือน</span><span>${MONTHS[currentMonth]}</span></div>
     <div class="bill-row"><span>เบอร์โทร</span><span>${h.phone||'-'}</span></div>
-    <div class="bill-row" style="margin-top:10px;align-items:center">
-      <span>ค่าเช่า</span>
-      <span style="display:flex;align-items:center;gap:6px">
-        <span id="rent-display-${idx}">${fmt(b.rentThisMonth)} บาท${b.rentThisMonth!==h.rent?' <span style="font-size:10px;color:#f59e0b">(เดือนนี้เท่านั้น)</span>':''}</span>
-        <button onclick="toggleRentEdit(${idx},${h.rent})" id="rent-edit-btn-${idx}" style="background:none;border:1px solid #555;color:#aaa;padding:1px 7px;font-size:11px;cursor:pointer;border-radius:3px">แก้ไข</button>
-      </span>
-    </div>
-    <div id="rent-edit-row-${idx}" style="display:none;margin:4px 0 8px;padding:8px;background:#1e2430;border-radius:6px;border:1px solid #334">
-      <div style="font-size:11px;color:#888;margin-bottom:5px">แก้ไขค่าเช่า UNIT ${h.id}</div>
-      <div style="display:flex;gap:6px">
-        <input id="rent-input-${idx}" type="number" value="${b.rentThisMonth}" style="flex:1;background:#111;border:1px solid #334;color:#fff;padding:5px 8px;font-size:14px;font-weight:700;border-radius:4px">
-        <button onclick="saveRentEdit(${idx})" style="background:var(--primary,#3d8bff);color:#fff;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">บันทึก</button>
-        <button onclick="document.getElementById('rent-edit-row-${idx}').style.display='none'" style="background:transparent;border:1px solid #444;color:#888;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px">ยกเลิก</button>
-      </div>
-    </div>
+    <div class="bill-row" style="margin-top:10px"><span>ค่าเช่า</span><span>${fmt(h.rent)} บาท</span></div>
     <div class="bill-row">
       <span>💧 ค่าน้ำ (${m.wPrev||0} → ${m.wCurr||0} = ${b.wUnits} หน่วย)</span>
       <span style="color:var(--water)">${fmt(b.wCost)} บาท</span>
@@ -1626,26 +1611,6 @@ function removeArrear(idx, arIdx) {
   save();
   renderBillDetail(idx);
   showToast('ลบยอดค้างออกแล้ว');
-}
-
-function toggleRentEdit(idx, currentRent) {
-  const row = document.getElementById('rent-edit-row-'+idx);
-  if(!row) return;
-  row.style.display = row.style.display==='none' ? 'block' : 'none';
-}
-
-function saveRentEdit(idx) {
-  const input = document.getElementById('rent-input-'+idx);
-  if(!input) return;
-  const newRent = parseFloat(input.value)||0;
-  if(newRent <= 0){ showToast('กรุณาระบุค่าเช่า','error'); return; }
-  // เก็บเฉพาะเดือนนี้ใน meters
-  const m = getMeter(currentMonth, houses[idx].id);
-  m.rentOverride = newRent;
-  save();
-  showToast('บันทึกค่าเช่าเดือน '+MONTHS[currentMonth]+' แล้ว ✓');
-  renderBillDetail(idx);
-  renderDashboard();
 }
 
 function markPaid() {
