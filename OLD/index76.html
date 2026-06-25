@@ -853,19 +853,13 @@ const fbAuth = firebase.auth();
 const fbDb   = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-// รับผล redirect กลับมา (กรณี popup ถูกบล็อก)
-fbAuth.getRedirectResult().catch(()=>{});
-
 window.signInWithGoogle = async () => {
   const btn = document.getElementById('google-login-btn');
   btn.textContent = 'กำลังเข้าสู่ระบบ...';
   btn.disabled = true;
   try {
-    await fbAuth.signInWithPopup(googleProvider);
+    await fbAuth.signInWithRedirect(googleProvider);
   } catch(e) {
-    if(e.code==='auth/popup-blocked'||e.code==='auth/popup-closed-by-user'){
-      try { await fbAuth.signInWithRedirect(googleProvider); return; } catch(e2){}
-    }
     btn.disabled = false;
     btn.textContent = 'เข้าสู่ระบบด้วย Google';
     const err = document.getElementById('auth-error');
