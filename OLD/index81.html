@@ -703,21 +703,6 @@
       <label class="form-label">เลขประจำตัวผู้เสียภาษี (13 หลัก)</label>
       <input type="text" class="form-input" id="modal-taxid" placeholder="x-xxxx-xxxxx-xx-x" maxlength="17">
     </div>
-    <div style="border-top:1px dashed #334;margin:12px 0 10px;padding-top:10px">
-      <div style="font-size:12px;color:#888;margin-bottom:8px">📋 ข้อมูลผู้ออกบิล (ถ้าไม่กรอกจะใช้ค่าจาก ตั้งค่าระบบ)</div>
-      <div class="form-row">
-        <label class="form-label">ชื่อผู้ออกบิล</label>
-        <input type="text" class="form-input" id="modal-owner-name" placeholder="เช่น นาย พงศ์พจน์ อู่ธนา">
-      </div>
-      <div class="form-row">
-        <label class="form-label">ที่อยู่ผู้ออกบิล</label>
-        <input type="text" class="form-input" id="modal-owner-addr" placeholder="เช่น 29 ซอยรามอินทรา 39...">
-      </div>
-      <div class="form-row">
-        <label class="form-label">เบอร์โทรผู้ออกบิล</label>
-        <input type="text" class="form-input" id="modal-owner-tel" placeholder="เช่น 089-140-0606">
-      </div>
-    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('houseModal')">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveHouse()">บันทึก</button>
@@ -1931,9 +1916,6 @@ function openEditHouse(idx) {
   document.getElementById('modal-phone').value   = h.phone||'';
   document.getElementById('modal-address').value = h.address||'';
   document.getElementById('modal-taxid').value   = h.taxid||'';
-  document.getElementById('modal-owner-name').value = h.ownerName||'';
-  document.getElementById('modal-owner-addr').value = h.ownerAddr||'';
-  document.getElementById('modal-owner-tel').value  = h.ownerTel||'';
   document.getElementById('modal-title').textContent = `แก้ไขบ้านหลังที่ ${h.id}`;
   document.getElementById('houseModal').classList.add('open');
 }
@@ -1945,10 +1927,7 @@ function saveHouse() {
   houses[idx].rent    = rentVal === '' ? houses[idx].rent : parseFloat(rentVal)||0;
   houses[idx].phone   = document.getElementById('modal-phone').value;
   houses[idx].address = document.getElementById('modal-address').value;
-  houses[idx].taxid     = document.getElementById('modal-taxid').value;
-  houses[idx].ownerName = document.getElementById('modal-owner-name').value;
-  houses[idx].ownerAddr = document.getElementById('modal-owner-addr').value;
-  houses[idx].ownerTel  = document.getElementById('modal-owner-tel').value;
+  houses[idx].taxid   = document.getElementById('modal-taxid').value;
   save();
   closeModal('houseModal');
   renderSettings();
@@ -1983,9 +1962,9 @@ function receiptHTML(idx) {
     <div class="receipt-header">
       <div>
         <div class="receipt-title">ใบเสร็จรับเงิน / ใบแจ้งหนี้</div>
-        <div class="receipt-owner">${h.ownerName||settings.landlordName||'นาย พงศ์พจน์ อู่ธนา'}</div>
-        <div class="receipt-owner-addr">${h.ownerAddr||settings.landlordAddr||'เลขที่ 29 ซอยรามอินทรา 39 แยก 3 แขวงอนุสาวรีย์ เขตบางเขน กรุงเทพมหานคร 10220'}</div>
-        <div class="receipt-owner-addr">โทร ${h.ownerTel||settings.landlordTel||'089-140-0606'}</div>
+        <div class="receipt-owner">นาย พงศ์พจน์ อู่ธนา</div>
+        <div class="receipt-owner-addr">เลขที่ 29 ซอยรามอินทรา 39 แยก 3 แขวงอนุสาวรีย์ เขตบางเขน กรุงเทพมหานคร 10220</div>
+        <div class="receipt-owner-addr">โทร 089-140-0606</div>
       </div>
       <div class="receipt-no">
         <div>เลขที่: ${String(h.id).padStart(3,'0')}-${currentMonth.replace('-','')}</div>
