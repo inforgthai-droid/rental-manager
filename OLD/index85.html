@@ -706,14 +706,6 @@
     <div style="border-top:1px dashed #334;margin:12px 0 10px;padding-top:10px">
       <div style="font-size:12px;color:#888;margin-bottom:8px">📋 ข้อมูลผู้ออกบิล (ถ้าไม่กรอกจะใช้ค่าจาก ตั้งค่าระบบ)</div>
       <div class="form-row">
-        <label class="form-label">เลือกชุดข้อมูล</label>
-        <select class="form-input" onchange="fillOwnerPreset(this.value)" style="cursor:pointer">
-          <option value="">— เลือก หรือกรอกเอง —</option>
-          <option value="1">นาย พงศ์พจน์ อู่ธนา</option>
-          <option value="2">A Property</option>
-        </select>
-      </div>
-      <div class="form-row">
         <label class="form-label">ชื่อผู้ออกบิล</label>
         <input type="text" class="form-input" id="modal-owner-name" placeholder="เช่น นาย พงศ์พจน์ อู่ธนา">
       </div>
@@ -2049,17 +2041,6 @@ function openEditHouse(idx) {
   document.getElementById('modal-owner-tel').value  = h.ownerTel||'';
   document.getElementById('modal-title').textContent = `แก้ไขบ้านหลังที่ ${h.id}`;
   document.getElementById('houseModal').classList.add('open');
-}
-
-function fillOwnerPreset(val) {
-  const presets = {
-    '1': {name:'นาย พงศ์พจน์ อู่ธนา', addr:'29 ซอยรามอินทรา 39 แยก 3 แขวงอนุสาวรีย์ เขตบางเขน กรุงเทพมหานคร 10220', tel:'089-140-0606'},
-    '2': {name:'A Property', addr:'Bangkok', tel:'-'},
-  };
-  if(!val || !presets[val]) return;
-  document.getElementById('modal-owner-name').value = presets[val].name;
-  document.getElementById('modal-owner-addr').value = presets[val].addr;
-  document.getElementById('modal-owner-tel').value  = presets[val].tel;
 }
 
 function saveHouse() {
