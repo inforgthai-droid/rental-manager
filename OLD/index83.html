@@ -820,11 +820,10 @@
     <div class="bill-box" id="bill-detail"></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('billModal')">ปิด</button>
-      <button class="btn btn-outline" onclick="printReceipt(activeBillIdx)">🖨️ พิมพ์บิล</button>
-      <button class="btn btn-outline" onclick="printContract(activeBillIdx)" style="border-color:#818cf8;color:#818cf8">📜 สัญญาเช่า</button>
-      <button class="btn btn-outline" style="border-color:#ef5350;color:#ef5350" onclick="saveReceiptPDF(activeBillIdx)">📄 PDF</button>
-      <button class="btn btn-sm" onclick="promptPartialPayModal()" style="background:#f59e0b;color:#000;font-weight:700">💛 บางส่วน</button>
-      <button class="btn btn-primary" onclick="markPaid()">✅ ชำระครบ</button>
+      <button class="btn btn-outline" onclick="printReceipt(activeBillIdx)">🖨️ พิมพ์</button>
+      <button class="btn btn-outline" style="border-color:#ef5350;color:#ef5350" onclick="saveReceiptPDF(activeBillIdx)">📄 บันทึก PDF</button>
+      <button class="btn btn-sm" onclick="promptPartialPayModal()" style="background:#f59e0b;color:#000;font-weight:700">💛 ชำระบางส่วน</button>
+      <button class="btn btn-primary" onclick="markPaid()">✅ ชำระครบแล้ว</button>
     </div>
   </div>
 </div>
@@ -1246,56 +1245,6 @@ function changeMonth() {
   const idx = [...document.querySelectorAll('.tab')].indexOf(active);
   const pages = ['dashboard','meters','bills','history','settings'];
   showPage(pages[idx]);
-  // ยกยอดค้างอัตโนมัติ (ถามก่อน)
-  setTimeout(()=>promptCarryForward(currentMonth), 300);
-}
-
-function promptCarryForward(toMonth) {
-  let hasUnpaid = false;
-  const [ty, tm] = toMonth.split('-').map(Number);
-  let pm = tm-1, py = ty;
-  if(pm<=0){pm+=12;py--;}
-  const prevMonth = padKey(py,pm);
-  houses.forEach((h,idx)=>{
-    const ps=(payments[prevMonth]||{})[h.id]||'unpaid';
-    if(ps==='paid') return;
-    const b=calcBill_for(idx,prevMonth);
-    if(b.total>0) hasUnpaid=true;
-  });
-  if(!hasUnpaid) return;
-  // เช็คว่า carry แล้วหรือยัง
-  let alreadyCarried=false;
-  houses.forEach((h,idx)=>{
-    const m=getMeter(toMonth,h.id);
-    if((m.arrears||[]).find(a=>a.month===prevMonth)) alreadyCarried=true;
-  });
-  if(alreadyCarried) return;
-  if(confirm(`พบยอดค้างชำระจากเดือน ${MONTHS[prevMonth]||prevMonth}\nต้องการยกยอดมารวมใน ${MONTHS[toMonth]||toMonth} ไหม?`)) {
-    autoCarryForward(toMonth);
-  }
-}
-
-function autoCarryForward(toMonth) {
-  let carried=0;
-  const [ty,tm]=toMonth.split('-').map(Number);
-  let pm=tm-1,py=ty;
-  if(pm<=0){pm+=12;py--;}
-  const prevMonth=padKey(py,pm);
-  houses.forEach((h,idx)=>{
-    const ps=(payments[prevMonth]||{})[h.id]||'unpaid';
-    if(ps==='paid') return;
-    const b=calcBill_for(idx,prevMonth);
-    let remainAmt=b.total;
-    if(Array.isArray(ps)) remainAmt=Math.max(0,b.total-ps.reduce((a,p)=>a+(parseFloat(p.amount)||0),0));
-    else if(typeof ps==='string'&&ps.startsWith('partial:')) remainAmt=Math.max(0,b.total-(parseFloat(ps.replace('partial:',''))||0));
-    if(remainAmt<=0) return;
-    const curM=getMeter(toMonth,h.id);
-    if((curM.arrears||[]).find(a=>a.month===prevMonth)) return;
-    if(!curM.arrears) curM.arrears=[];
-    curM.arrears.push({month:prevMonth,label:MONTHS[prevMonth]||prevMonth,amount:remainAmt});
-    carried++;
-  });
-  if(carried>0){save();showToast(`ยกยอดค้าง ${carried} ห้อง ✓`);renderDashboard();renderBills();}
 }
 
 // ═══════════════════════════════════════════
@@ -2075,171 +2024,6 @@ function printAll() {
 // ═══════════════════════════════════════════
 //  PRINT RECEIPT
 // ═══════════════════════════════════════════
-function printContract(idx) {
-  const h = houses[idx];
-  const ownerName = h.ownerName||settings.landlordName||'นาย พงศ์พจน์ อู่ธนา';
-  const ownerAddr = h.ownerAddr||settings.landlordAddr||'29 ซอยรามอินทรา 39 แยก 3 แขวงอนุสาวรีย์ เขตบางเขน กรุงเทพมหานคร 10220';
-  const ownerTel  = h.ownerTel||settings.landlordTel||'089-140-0606';
-  const today = new Date();
-  const thDate = today.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-  const html = `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
-  <title>สัญญาเช่า UNIT ${h.id}</title>
-  <style>
-    body{font-family:'Sarabun','TH Sarabun New',sans-serif;font-size:16px;line-height:1.8;margin:0;padding:0;color:#000}
-    .page{width:21cm;min-height:29.7cm;margin:0 auto;padding:2cm 2.5cm;box-sizing:border-box}
-    h1{text-align:center;font-size:20px;font-weight:bold;margin-bottom:4px}
-    h2{text-align:center;font-size:16px;font-weight:normal;margin-top:0;margin-bottom:24px}
-    .section{margin-bottom:16px}
-    .clause{margin-bottom:12px;text-indent:2em}
-    .indent{margin-left:2em}
-    .sign-row{display:flex;justify-content:space-around;margin-top:48px}
-    .sign-box{text-align:center;width:40%}
-    .sign-line{border-bottom:1px solid #000;width:200px;margin:40px auto 6px}
-    table{width:100%;border-collapse:collapse;margin:8px 0}
-    td,th{border:1px solid #000;padding:6px 10px;font-size:15px}
-    th{background:#eee;font-weight:bold;text-align:center}
-    .highlight{font-weight:bold}
-    @media print{body{margin:0}.page{margin:0;padding:1.5cm 2cm}}
-  </style></head><body>
-  <div class="page">
-    <h1>สัญญาเช่าที่พักอาศัย</h1>
-    <h2>Rental Agreement</h2>
-    <p style="text-align:right">ทำที่ ${ownerAddr}<br>วันที่ ${thDate}</p>
-
-    <div class="section">
-      <p class="clause">สัญญาฉบับนี้ทำขึ้นระหว่าง</p>
-      <table>
-        <tr><th colspan="2">ผู้ให้เช่า (Landlord)</th></tr>
-        <tr><td width="35%">ชื่อ</td><td><span class="highlight">${ownerName}</span></td></tr>
-        <tr><td>ที่อยู่</td><td>${ownerAddr}</td></tr>
-        <tr><td>เบอร์โทรศัพท์</td><td>${ownerTel}</td></tr>
-      </table>
-      <table style="margin-top:10px">
-        <tr><th colspan="2">ผู้เช่า (Tenant)</th></tr>
-        <tr><td width="35%">ชื่อ</td><td><span class="highlight">${h.name||'__________________'}</span></td></tr>
-        <tr><td>ที่อยู่</td><td>${h.address||'__________________'}</td></tr>
-        <tr><td>เบอร์โทรศัพท์</td><td>${h.phone||'__________________'}</td></tr>
-        <tr><td>เลขบัตรประชาชน</td><td>${h.taxId||'__________________'}</td></tr>
-      </table>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 1. ทรัพย์สินที่เช่า</strong></p>
-      <p class="clause">ผู้ให้เช่าตกลงให้เช่า และผู้เช่าตกลงเช่า <span class="highlight">ห้องพักเลขที่ UNIT ${h.id}</span>
-      ตั้งอยู่ที่ ${ownerAddr} ในสภาพที่ผู้เช่าได้ตรวจสอบและยอมรับแล้ว</p>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 2. ระยะเวลาเช่า</strong></p>
-      <p class="clause">กำหนดระยะเวลาเช่า <span class="highlight">1 ปี</span> นับแต่วันที่ ${thDate}
-      เมื่อสัญญาสิ้นสุดลง หากผู้เช่าประสงค์จะต่อสัญญา ให้แจ้งล่วงหน้าไม่น้อยกว่า <span class="highlight">30 วัน</span>
-      ก่อนวันสิ้นสุดสัญญา</p>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 3. ค่าเช่าและการชำระเงิน</strong></p>
-      <p class="clause">ผู้เช่าตกลงชำระค่าเช่าเดือนละ <span class="highlight">${(h.rent||0).toLocaleString('th-TH')} บาท (${numToThaiText(h.rent||0)})</span>
-      โดยชำระภายในวันที่ <span class="highlight">5</span> ของทุกเดือน หากชำระล่าช้าเกิน 7 วัน
-      ผู้เช่าตกลงเสียค่าปรับในอัตราร้อยละ 5 ต่อเดือนของค่าเช่าที่ค้างชำระ</p>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 4. เงินประกัน</strong></p>
-      <p class="clause">ผู้เช่าได้วางเงินประกันจำนวน <span class="highlight">${((h.rent||0)*2).toLocaleString('th-TH')} บาท</span>
-      (เท่ากับค่าเช่า 2 เดือน) เพื่อเป็นหลักประกันการปฏิบัติตามสัญญา
-      ผู้ให้เช่าจะคืนเงินประกันภายใน 30 วัน นับแต่วันที่ผู้เช่าส่งมอบห้องพักคืน
-      โดยหักค่าเสียหายที่เกิดจากความผิดของผู้เช่า (ถ้ามี)</p>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 5. ค่าสาธารณูปโภค</strong></p>
-      <p class="clause">ผู้เช่าเป็นผู้รับผิดชอบค่าสาธารณูปโภคในอัตรา ดังนี้</p>
-      <div class="indent">
-        <p>5.1 ค่าไฟฟ้า อัตรา <span class="highlight">${settings.elecRate||8} บาท/หน่วย</span></p>
-        <p>5.2 ค่าน้ำประปา อัตรา <span class="highlight">${settings.waterRate||18} บาท/หน่วย</span></p>
-        <p>5.3 ผู้เช่าจะต้องชำระค่าสาธารณูปโภคพร้อมกับค่าเช่าในทุกเดือน</p>
-      </div>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 6. หน้าที่ของผู้เช่า</strong></p>
-      <div class="indent">
-        <p>6.1 ผู้เช่าต้องใช้ห้องพักเพื่อการพักอาศัยเท่านั้น ห้ามใช้เพื่อการพาณิชย์หรือกิจการใดๆ</p>
-        <p>6.2 ผู้เช่าต้องรักษาห้องพักและทรัพย์สินในห้องให้อยู่ในสภาพที่ดี</p>
-        <p>6.3 ผู้เช่าต้องไม่ดัดแปลงหรือต่อเติมห้องพักโดยไม่ได้รับอนุญาตจากผู้ให้เช่า</p>
-        <p>6.4 <span class="highlight">ห้ามกระทำการใดที่ก่อให้เกิดเสียงดังรบกวนผู้อื่น</span> ไม่ว่าเวลาใดก็ตาม</p>
-        <p>6.5 <span class="highlight">ห้ามกระทำการใดๆ ที่ผิดกฎหมายในสถานที่เช่า</span> รวมถึงการครอบครองหรือจำหน่ายสิ่งผิดกฎหมายทุกประเภท หากฝ่าฝืนผู้ให้เช่ามีสิทธิบอกเลิกสัญญาได้ทันทีโดยไม่ต้องแจ้งล่วงหน้า</p>
-        <p>6.6 ผู้เช่าต้องรับผิดชอบความเสียหายที่เกิดจากการกระทำของผู้เช่าหรือบุคคลที่ผู้เช่าอนุญาตให้เข้ามาในห้องพัก</p>
-      </div>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 7. การบอกเลิกสัญญา</strong></p>
-      <p class="clause">ผู้เช่าประสงค์จะบอกเลิกสัญญาก่อนกำหนด ต้องแจ้งเป็นลายลักษณ์อักษรล่วงหน้าไม่น้อยกว่า
-      <span class="highlight">30 วัน</span> และผู้เช่าจะไม่ได้รับคืนค่าเช่าที่ชำระไปแล้ว
-      ผู้ให้เช่ามีสิทธิบอกเลิกสัญญาได้ทันที หากผู้เช่าผิดนัดชำระค่าเช่าติดต่อกันเกิน 2 เดือน
-      หรือกระทำการผิดข้อตกลงในสัญญาข้อ 6</p>
-    </div>
-
-    <div class="section">
-      <p><strong>ข้อ 8. อื่นๆ</strong></p>
-      <div class="indent">
-        <p>8.1 สัญญาฉบับนี้ทำขึ้น 2 ฉบับ มีข้อความเหมือนกันทุกประการ คู่สัญญาแต่ละฝ่ายถือไว้ฝ่ายละ 1 ฉบับ</p>
-        <p>8.2 หากมีข้อพิพาทเกิดขึ้น คู่สัญญาจะพยายามตกลงกันโดยสันติวิธีก่อน หากตกลงกันไม่ได้ให้ถือเขตอำนาจศาลที่ทรัพย์สินตั้งอยู่เป็นศาลที่มีอำนาจพิจารณา</p>
-      </div>
-    </div>
-
-    <div class="sign-row">
-      <div class="sign-box">
-        <div class="sign-line"></div>
-        <div>ผู้ให้เช่า</div>
-        <div>(${ownerName})</div>
-        <div style="margin-top:6px;font-size:14px">วันที่ ........./........./.........</div>
-      </div>
-      <div class="sign-box">
-        <div class="sign-line"></div>
-        <div>ผู้เช่า</div>
-        <div>(${h.name||'__________________'})</div>
-        <div style="margin-top:6px;font-size:14px">วันที่ ........./........./.........</div>
-      </div>
-    </div>
-
-    <div class="sign-row" style="margin-top:32px">
-      <div class="sign-box">
-        <div class="sign-line"></div>
-        <div>พยาน</div>
-        <div>(__________________)</div>
-        <div style="margin-top:6px;font-size:14px">วันที่ ........./........./.........</div>
-      </div>
-      <div class="sign-box">
-        <div class="sign-line"></div>
-        <div>พยาน</div>
-        <div>(__________________)</div>
-        <div style="margin-top:6px;font-size:14px">วันที่ ........./........./.........</div>
-      </div>
-    </div>
-  </div>
-  </body></html>`;
-  buildReceiptWindow(html, `สัญญาเช่า UNIT ${h.id}`);
-}
-
-function numToThaiText(n) {
-  const units=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
-  const pos=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];
-  if(!n||n===0) return 'ศูนย์บาทถ้วน';
-  const s=Math.round(n).toString();
-  let result='';
-  for(let i=0;i<s.length;i++){
-    const d=parseInt(s[i]);
-    const p=s.length-1-i;
-    if(d===0) continue;
-    if(p===1&&d===1){result+='สิบ';continue;}
-    if(p===1&&d===2){result+='ยี่สิบ';continue;}
-    result+=units[d]+pos[p];
-  }
-  return result+'บาทถ้วน';
-}
-
 function receiptHTML(idx) {
   const h = houses[idx];
   const b = calcBill(idx);
@@ -2339,25 +2123,6 @@ function receiptHTML(idx) {
           <td colspan="2"><strong>รวมทั้งสิ้น</strong></td>
           <td style="text-align:right"><span class="receipt-amount">${fmt(b.total)}</span></td>
         </tr>
-        ${b.partial && b.partialAmount > 0 ? `
-        <tr style="background:#f0fdf4">
-          <td colspan="2" style="color:#15803d">ชำระแล้ว</td>
-          <td style="text-align:right;color:#15803d;font-weight:700">- ${fmt(b.partialAmount)}</td>
-        </tr>
-        <tr style="background:#fff3cd">
-          <td colspan="2" style="color:#92400e;font-weight:700">⚠️ ยอดคงค้าง</td>
-          <td style="text-align:right;color:#b45309;font-weight:700;font-size:15px">${fmt(b.remaining)}</td>
-        </tr>` : ''}
-        ${!b.paid && !b.partial ? `
-        <tr style="background:#fff3cd">
-          <td colspan="2" style="color:#92400e;font-weight:700">⚠️ ยอดคงค้าง</td>
-          <td style="text-align:right;color:#b45309;font-weight:700;font-size:15px">${fmt(b.total)}</td>
-        </tr>` : ''}
-        ${b.paid ? `
-        <tr style="background:#f0fdf4">
-          <td colspan="2" style="color:#15803d;font-weight:700">✅ ชำระครบแล้ว</td>
-          <td style="text-align:right;color:#15803d;font-weight:700">0</td>
-        </tr>` : ''}
       </tbody>
     </table>
     <div class="receipt-footer">
