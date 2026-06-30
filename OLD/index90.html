@@ -704,19 +704,6 @@
       <input type="text" class="form-input" id="modal-taxid" placeholder="x-xxxx-xxxxx-xx-x" maxlength="17">
     </div>
     <div style="border-top:1px dashed #334;margin:12px 0 10px;padding-top:10px">
-      <div style="font-size:12px;color:#888;margin-bottom:8px">💧⚡ ราคาค่าน้ำ/ค่าไฟต่อหน่วยของห้องนี้ (ถ้าไม่กรอกจะใช้ค่ากลางจาก ตั้งค่าระบบ)</div>
-      <div class="form-row-2">
-        <div>
-          <label class="form-label">ค่าน้ำ/หน่วย (บาท)</label>
-          <input type="number" step="0.01" class="form-input" id="modal-water-rate" placeholder="ใช้ค่ากลาง">
-        </div>
-        <div>
-          <label class="form-label">ค่าไฟ/หน่วย (บาท)</label>
-          <input type="number" step="0.01" class="form-input" id="modal-elec-rate" placeholder="ใช้ค่ากลาง">
-        </div>
-      </div>
-    </div>
-    <div style="border-top:1px dashed #334;margin:12px 0 10px;padding-top:10px">
       <div style="font-size:12px;color:#888;margin-bottom:8px">📋 ข้อมูลผู้ออกบิล (ถ้าไม่กรอกจะใช้ค่าจาก ตั้งค่าระบบ)</div>
       <div class="form-row">
         <label class="form-label">เลือกชุดข้อมูล</label>
@@ -1055,10 +1042,6 @@ let settings = (() => {
   return stored;
 })();
 
-// ราคาน้ำ/ไฟต่อหน่วยของห้องนั้นๆ — ใช้ค่าที่ตั้งแยกรายห้อง ถ้าไม่มีใช้ค่ากลาง
-function getWaterRate(h) { return (h && h.waterRate != null) ? h.waterRate : settings.waterRate; }
-function getElecRate(h)  { return (h && h.elecRate  != null) ? h.elecRate  : settings.elecRate; }
-
 // 20 houses — ข้อมูลผู้เช่าจริง
 const defaultHouses = [
   { id:1,  name:"บริษัท วีเจ้นซ์ จํากัด",                  rent:42000, phone:"",             address:"เลขที่ 18 ถนนรามอินทรา ซอยรามอินทรา 39 แยก13 แขวงอนุสาวรีย์ เขตบางเขน จ.กรุงเทพฯ 10220", taxid:"" },
@@ -1157,8 +1140,8 @@ function calcBill(idx) {
   const discountNote = m.discountNote||'';
   const wUnits = Math.max(0, (m.wCurr||0) - (m.wPrev||0));
   const eUnits = Math.max(0, (m.eCurr||0) - (m.ePrev||0));
-  const wCost  = wUnits * getWaterRate(h);
-  const eCost  = eUnits * getElecRate(h);
+  const wCost  = wUnits * settings.waterRate;
+  const eCost  = eUnits * settings.elecRate;
   const extras = parseFloat(m.extras)||0;
   const extraItems = m.extraItems || [];
   const extraItemsTotal = extraItems.reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
@@ -1364,8 +1347,8 @@ function renderDashboard() {
   document.getElementById('sum-elec').innerHTML = `${fmt(sumElec)}<span>บาท</span>`;
   document.getElementById('sum-total').innerHTML = `${fmt(sumTotal)}<span>บาท</span>`;
   document.getElementById('sum-rent-sub').textContent = `${houses.length} หลัง`;
-  document.getElementById('sum-water-sub').textContent = `@ ${settings.waterRate} บาท/หน่วย (ค่ากลาง)`;
-  document.getElementById('sum-elec-sub').textContent = `@ ${settings.elecRate} บาท/หน่วย (ค่ากลาง)`;
+  document.getElementById('sum-water-sub').textContent = `@ ${settings.waterRate} บาท/หน่วย`;
+  document.getElementById('sum-elec-sub').textContent = `@ ${settings.elecRate} บาท/หน่วย`;
   document.getElementById('sum-paid-sub').textContent = `ชำระแล้ว ${paidCnt}/${houses.length} หลัง`;
 }
 
@@ -1396,8 +1379,8 @@ function openMeterModal(idx) {
   document.getElementById('mm-eCurr').value    = m.eCurr||'';
   document.getElementById('mm-extras').value   = m.extras||'';
   document.getElementById('mm-extrasNote').value = m.extrasNote||'';
-  document.getElementById('mm-wRate').textContent = getWaterRate(h);
-  document.getElementById('mm-eRate').textContent = getElecRate(h);
+  document.getElementById('mm-wRate').textContent = settings.waterRate;
+  document.getElementById('mm-eRate').textContent = settings.elecRate;
   calcMeterModal();
   document.getElementById('meterModal').classList.add('open');
 }
@@ -1413,8 +1396,8 @@ function calcMeterModal() {
   const extras = parseFloat(document.getElementById('mm-extras').value)||0;
   const wU = Math.max(0, wCurr - wPrev);
   const eU = Math.max(0, eCurr - ePrev);
-  const wCost = wU * getWaterRate(h);
-  const eCost = eU * getElecRate(h);
+  const wCost = wU * settings.waterRate;
+  const eCost = eU * settings.elecRate;
   const total = h.rent + wCost + eCost + extras;
   document.getElementById('mm-wUnits').textContent = wU + ' หน่วย';
   document.getElementById('mm-wCost').textContent  = fmt(wCost) + ' บาท';
@@ -1923,7 +1906,7 @@ function calcBill_for(idx, month) {
   const rentThisMonth = (m.rentOverride != null && m.rentOverride !== '') ? parseFloat(m.rentOverride)||h.rent : h.rent;
   const discount = parseFloat(m.discount)||0;
   const discountNote = m.discountNote||'';
-  const total = rentThisMonth + wUnits*getWaterRate(h) + eUnits*getElecRate(h) + extras + extraItemsTotal + arrearsTotal;
+  const total = rentThisMonth + wUnits*settings.waterRate + eUnits*settings.elecRate + extras + extraItemsTotal + arrearsTotal;
   return { total, rentThisMonth };
 }
 
@@ -2061,8 +2044,6 @@ function openEditHouse(idx) {
   document.getElementById('modal-phone').value   = h.phone||'';
   document.getElementById('modal-address').value = h.address||'';
   document.getElementById('modal-taxid').value   = h.taxid||'';
-  document.getElementById('modal-water-rate').value = (h.waterRate!=null) ? h.waterRate : '';
-  document.getElementById('modal-elec-rate').value  = (h.elecRate!=null) ? h.elecRate : '';
   document.getElementById('modal-owner-name').value = h.ownerName||'';
   document.getElementById('modal-owner-addr').value = h.ownerAddr||'';
   document.getElementById('modal-owner-tel').value  = h.ownerTel||'';
@@ -2089,10 +2070,6 @@ function saveHouse() {
   houses[idx].phone   = document.getElementById('modal-phone').value;
   houses[idx].address = document.getElementById('modal-address').value;
   houses[idx].taxid     = document.getElementById('modal-taxid').value;
-  const wRateVal = document.getElementById('modal-water-rate').value;
-  const eRateVal = document.getElementById('modal-elec-rate').value;
-  houses[idx].waterRate = wRateVal === '' ? null : (parseFloat(wRateVal)||null);
-  houses[idx].elecRate  = eRateVal === '' ? null : (parseFloat(eRateVal)||null);
   houses[idx].ownerName = document.getElementById('modal-owner-name').value;
   houses[idx].ownerAddr = document.getElementById('modal-owner-addr').value;
   houses[idx].ownerTel  = document.getElementById('modal-owner-tel').value;
@@ -2197,8 +2174,8 @@ function printContract(idx) {
       <p><strong>ข้อ 5. ค่าสาธารณูปโภค</strong></p>
       <p class="clause">ผู้เช่าเป็นผู้รับผิดชอบค่าสาธารณูปโภคในอัตรา ดังนี้</p>
       <div class="indent">
-        <p>5.1 ค่าไฟฟ้า อัตรา <span class="highlight">${getElecRate(h)||8} บาท/หน่วย</span></p>
-        <p>5.2 ค่าน้ำประปา อัตรา <span class="highlight">${getWaterRate(h)||18} บาท/หน่วย</span></p>
+        <p>5.1 ค่าไฟฟ้า อัตรา <span class="highlight">${settings.elecRate||8} บาท/หน่วย</span></p>
+        <p>5.2 ค่าน้ำประปา อัตรา <span class="highlight">${settings.waterRate||18} บาท/หน่วย</span></p>
         <p>5.3 ผู้เช่าจะต้องชำระค่าสาธารณูปโภคพร้อมกับค่าเช่าในทุกเดือน</p>
       </div>
     </div>
