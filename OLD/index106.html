@@ -1143,7 +1143,7 @@ function save() {
   if(typeof saveToFirestore === 'function') saveToFirestore();
 }
 
-function fmt(n) { return Number(n||0).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmt(n) { return Number(n||0).toLocaleString('th-TH'); }
 
 function getMeter(month, id) {
   return (meters[month]||{})[id] || {wPrev:0, wCurr:0, ePrev:0, eCurr:0, extras:0, extrasNote:''};
