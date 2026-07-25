@@ -2385,6 +2385,15 @@ function receiptHTML(idx) {
         <tr style="background:#f0fdf4">
           <td colspan="2" style="color:#15803d">ชำระแล้ว</td>
           <td style="text-align:right;color:#15803d;font-weight:700">- ${fmt(b.partialAmount)}</td>
+        </tr>
+        <tr style="background:#fff3cd">
+          <td colspan="2" style="color:#92400e;font-weight:700">⚠️ ยอดคงค้าง</td>
+          <td style="text-align:right;color:#b45309;font-weight:700;font-size:15px">${fmt(b.remaining)}</td>
+        </tr>` : ''}
+        ${!b.paid && !b.partial ? `
+        <tr style="background:#fff3cd">
+          <td colspan="2" style="color:#92400e;font-weight:700">⚠️ ยอดคงค้าง</td>
+          <td style="text-align:right;color:#b45309;font-weight:700;font-size:15px">${fmt(b.total)}</td>
         </tr>` : ''}
         ${b.paid ? `
         <tr style="background:#f0fdf4">
